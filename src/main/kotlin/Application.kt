@@ -1,7 +1,6 @@
 package com.example
 
 import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -9,23 +8,34 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class Producto(val id: Int, val nombre: String, val descripcion: String)
+data class Categoria(val id: Int, val nombre: String)
 
 @Serializable
-data class ProductoInput(val nombre: String, val descripcion: String)
+data class Producto(val id: Int, val nombre: String, val descripcion: String, val categoriaId: Int)
+
+@Serializable
+data class ProductoInput(val nombre: String, val descripcion: String, val categoriaId: Int)
+
+val categorias = mutableListOf(
+    Categoria(1, "Electrónica"),
+    Categoria(2, "Periféricos"),
+    Categoria(3, "Hogar")
+)
 
 val productos = mutableListOf(
-    Producto(id = 1, nombre = "Laptop", descripcion = "Ultrabook 13 pulgadas"),
-    Producto(id = 2, nombre = "Smartphone", descripcion = "Pantalla OLED 6.1''"),
-    Producto(id = 3, nombre = "Teclado", descripcion = "Mecánico retroiluminado"),
-    Producto(id = 4, nombre = "Mouse", descripcion = "Ergonómico inalámbrico"),
-    Producto(id = 5, nombre = "Monitor", descripcion = "4K UHD 27 pulgadas")
+    Producto(1, "Laptop", "Ultrabook 13 pulgadas", 1),
+    Producto(2, "Smartphone", "Pantalla OLED 6.1''", 1),
+    Producto(3, "Teclado", "Mecánico retroiluminado", 2),
+    Producto(4, "Mouse", "Ergonómico inalámbrico", 2),
+    Producto(5, "Aspiradora", "Robot aspirador", 3)
 )
+
 var ultimoId = productos.maxOf { it.id }
 
 fun main() {
@@ -47,60 +57,76 @@ fun Application.modulo() {
         }
 
         get("/productos") {
-            call.respond(productos)
+            val categoriaId = call.request.queryParameters["categoriaId"]?.toIntOrNull()
+            val resultado = if (categoriaId != null) {
+                productos.filter { it.categoriaId == categoriaId }
+            } else {
+                productos
+            }
+            call.respond(resultado)
         }
+
 
         get("/productos/{id}") {
             val id = call.parameters["id"]?.toIntOrNull()
-            if (id != null) {
-                val item = productos.find { it.id == id }
-                if (item != null) {
-                    call.respond(item)
-                } else {
-                    call.respond(HttpStatusCode.NotFound, "No existe")
-                }
+            val producto = productos.find { it.id == id }
+            if (producto != null) {
+                call.respond(producto)
             } else {
-                call.respond(HttpStatusCode.BadRequest, "ID no válido")
+                call.respond(HttpStatusCode.NotFound, "Producto no encontrado")
             }
         }
 
+        get("/productos/categoria/{categoriaId}") {
+            val categoriaId = call.parameters["categoriaId"]?.toIntOrNull()
+            if (categoriaId != null) {
+                val filtrados = productos.filter { it.categoriaId == categoriaId }
+                call.respond(filtrados)
+            } else {
+                call.respond(HttpStatusCode.BadRequest, "ID de categoría inválido")
+            }
+        }
+        
         post("/productos") {
-            val datos = call.receive<ProductoInput>()
-            val nuevo = Producto(id = ++ultimoId, nombre = datos.nombre, descripcion = datos.descripcion)
+            val input = call.receive<ProductoInput>()
+            val nuevo = Producto(++ultimoId, input.nombre, input.descripcion, input.categoriaId)
             productos.add(nuevo)
             call.respond(HttpStatusCode.Created, nuevo)
         }
 
+        // Actualizar producto
         put("/productos/{id}") {
             val id = call.parameters["id"]?.toIntOrNull()
             if (id != null) {
-                val actual = productos.find { it.id == id }
-                if (actual != null) {
+                val existente = productos.find { it.id == id }
+                if (existente != null) {
                     val entrada = call.receive<ProductoInput>()
-                    val actualizado = Producto(id = id, nombre = entrada.nombre, descripcion = entrada.descripcion)
-                    productos[productos.indexOf(actual)] = actualizado
+                    val actualizado = Producto(id, entrada.nombre, entrada.descripcion, entrada.categoriaId)
+                    productos[productos.indexOf(existente)] = actualizado
                     call.respond(actualizado)
                 } else {
-                    call.respond(HttpStatusCode.NotFound, "No encontrado")
+                    call.respond(HttpStatusCode.NotFound, "Producto no encontrado")
                 }
             } else {
                 call.respond(HttpStatusCode.BadRequest, "ID inválido")
             }
         }
 
+        // Eliminar producto
         delete("/productos/{id}") {
             val id = call.parameters["id"]?.toIntOrNull()
-            if (id != null) {
-                val item = productos.find { it.id == id }
-                if (item != null) {
-                    productos.remove(item)
-                    call.respond(HttpStatusCode.NoContent)
-                } else {
-                    call.respond(HttpStatusCode.NotFound, "No existe")
-                }
+            val producto = productos.find { it.id == id }
+            if (producto != null) {
+                productos.remove(producto)
+                call.respond(HttpStatusCode.NoContent)
             } else {
-                call.respond(HttpStatusCode.BadRequest, "ID inválido")
+                call.respond(HttpStatusCode.NotFound, "Producto no encontrado")
             }
+        }
+
+        // Listar categorías
+        get("/categorias") {
+            call.respond(categorias)
         }
     }
 }
