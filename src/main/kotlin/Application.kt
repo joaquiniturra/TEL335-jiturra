@@ -42,7 +42,7 @@ fun main() {
     embeddedServer(Netty, port = 8080, module = Application::modulo).start(wait = true)
 }
 
-fun Application.modulo() {
+fun Application.module() {
     install(ContentNegotiation) {
         json(Json {
             prettyPrint = true
