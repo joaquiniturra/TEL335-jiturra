@@ -39,7 +39,7 @@ val productos = mutableListOf(
 var ultimoId = productos.maxOf { it.id }
 
 fun main() {
-    embeddedServer(Netty, port = 8080, module = Application::modulo).start(wait = true)
+    embeddedServer(Netty, port = 8080, module = Application::module).start(wait = true)
 }
 
 fun Application.module() {
